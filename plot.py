@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
-
+plt.switch_backend('agg')
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -27,8 +27,8 @@ def plot(args):
         model = PCA(n_components=2)
     elif args.model == 'tsne':
         model = TSNE(n_components=2, perplexity=30, init='pca', method='exact', n_iter=5000)
-    word2idx = pickle.load(open('data/word2idx.dat', 'rb'))
-    idx2vec = pickle.load(open('data/idx2vec.dat', 'rb'))
+    word2idx = pickle.load(open(os.path.join(args.data_dir, 'word2idx.dat'), 'rb'))
+    idx2vec = pickle.load(open(os.path.join(args.data_dir, 'idx2vec.dat'), 'rb'))
     X = [idx2vec[word2idx[word]] for word in words]
     X = model.fit_transform(X)
     plt.figure(figsize=(18, 18))
