@@ -1,12 +1,14 @@
 import torch
 from torch import nn
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class SkipGramNeg(nn.Module):
     def __init__(self, vocab_size, emb_dim):
         super(SkipGramNeg, self).__init__()
-        self.input_emb = nn.Embedding(vocab_size, emb_dim, sparse=True)
+        self.input_emb = nn.Embedding(vocab_size, emb_dim, sparse=True).to(device)
         #print(self.input_emb.size())
-        self.output_emb = nn.Embedding(vocab_size, emb_dim, sparse=True)
+        self.output_emb = nn.Embedding(vocab_size, emb_dim, sparse=True).to(device)
         #print(self.output_emb.size())
         self.log_sigmoid = nn.LogSigmoid()
 

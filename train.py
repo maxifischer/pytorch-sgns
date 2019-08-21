@@ -6,6 +6,7 @@ import random
 import argparse
 import torch as t
 import numpy as np
+import resource
 
 from tqdm import tqdm
 from torch.optim import SGD
@@ -13,8 +14,27 @@ from torch.utils.data import Dataset, DataLoader
 from model import SkipGramNeg
 
 #from data_utils import build_dataset, DataPipeline
-
+#os.environ["CUDA_VISIBLE_DEVICES"]="2"
+print("Using {}".format(t.cuda.device_count()))
 device = t.device("cuda:0" if t.cuda.is_available() else "cpu")
+
+def memory_limit():
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    resource.setrlimit(resource.RLIMIT_AS, (get_memory() * 1024 / 4, hard))
+
+def get_memory():
+    with open('/proc/meminfo', 'r') as mem:
+        free_memory = 0
+        for i in mem:
+            sline = i.split()
+            if str(sline[0]) in ('MemFree:', 'Buffers:', 'Cached:'):
+                free_memory += int(sline[1])
+    return free_memory
+
+memory_limit()
+
+#available, total = cuda.mem_get_info()
+#print("Available: %.2f GB\nTotal:     %.2f GB"%(available/1e9, total/1e9))
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -166,6 +186,7 @@ def train(args):
             loss.backward()
             optim.step()
             pbar.set_postfix(loss=loss.item())
+            print("Loss: {}".format(loss))
     idx2vec = model.input_emb.weight.data.cpu().numpy()
     pickle.dump(idx2vec, open(os.path.join(args.data_dir, 'idx2vec.dat'), 'wb'))
     t.save(model.state_dict(), os.path.join(args.save_dir, '{}.pt'.format(args.name)))

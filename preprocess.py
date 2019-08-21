@@ -4,6 +4,7 @@ import os
 import codecs
 import pickle
 import argparse
+import re
 
 
 def parse_args():
@@ -24,34 +25,51 @@ class Preprocess(object):
         self.unk = unk
         self.data_dir = data_dir
 
+    def process_file(self, filepath):
+        #print("Processing file...")
+        with codecs.open(filepath, 'r', encoding='utf-8') as loaded_file:
+            corpus = []
+            #print("Loaded file...")
+            text = loaded_file.read()
+            #print(len(text))
+            text = text.lower()
+            #print(len(text))
+            text.replace('\n', ' ')
+            #print(len(text))
+            text = re.sub('[^a-z ]+', '', text)
+            #print(len(text))
+            corpus.extend([w for  w in text.split() if w != ''])
+            #print(len(corpus))
+        self.text = corpus
+
     def skipgram(self, sentence, i):
         iword = sentence[i]
-        #left = sentence[max(i - self.window, 0): i]
+        left = sentence[max(i - self.window, 0): i]
         right = sentence[i + 1: i + 1 + self.window]
         #print("iword: {}".format(iword))
         #print("owords: {}".format(right + [self.unk for _ in range(self.window - len(right))]))
-        return iword, right + [self.unk for _ in range(self.window - len(right))]
+        return iword, [self.unk for _ in range(self.window - len(left))] + left + right + [self.unk for _ in range(self.window - len(right))]
 
     def build(self, filepath, max_vocab=20000):
         print("building vocab...")
         step = 0
         self.wc = {self.unk: 1}
         self.tc = 0
-        with codecs.open(filepath, 'r', encoding='utf-8') as file:
-            for line in file:
-                step += 1
-                if not step % 1000:
-                    print("working on {}kth line".format(step // 1000), end='\r')
-                line = line.strip()
-                if not line:
-                    continue
-                num_appearances = int(line.split()[-1])
-                #print(num_appearances)
-                data_nonumbers = ''.join(c for c in line if not c.isdigit())
-                sent = data_nonumbers.split()
-                for word in sent:
-                    self.tc += 1
-                    self.wc[word] = self.wc.get(word, 0) + num_appearances
+        #with codecs.open(filepath, 'r', encoding='utf-8') as file:
+        #    for line in file:
+        #        step += 1
+        #        if not step % 1000:
+        #            print("working on {}kth line".format(step // 1000), end='\r')
+        #        line = line.strip()
+        #        if not line:
+        #            continue
+        #        num_appearances = int(line.split()[-1])
+        #        print(num_appearances)
+        #        data_nonumbers = ''.join(c for c in line if not c.isdigit())
+        #        sent = data_nonumbers.split()
+        for word in self.text:
+            self.tc += 1
+            self.wc[word] = self.wc.get(word, 0) + 1
         self.idx2word = [self.unk] + sorted(self.wc, key=self.wc.get, reverse=True)[:max_vocab - 1]
         self.word2idx = {self.idx2word[idx]: idx for idx, _ in enumerate(self.idx2word)}
         self.vocab = set([word for word in self.word2idx])
@@ -69,35 +87,32 @@ class Preprocess(object):
         data = []
         no_input = 0
         no_target = 0
-        with codecs.open(filepath, 'r', encoding='utf-8') as file:
-            for line in file:
-                step += 1
-                if not step % 1000:
-                    print("working on {}kth line".format(step // 1000), end='\r')
-                line = line.strip()
-                if not line:
-                    continue
-                sent = []
-                for word in line.split():
-                    if word in self.vocab:
-                        sent.append(word)
-                    else:
-                        sent.append(self.unk)
+        #self.text = self.preprocess_file(filepath)
+        sent = []
+        for word in self.text:
+            if word in self.vocab:
+                sent.append(word)
+            else:
+                sent.append(self.unk)
                 #for i in range(len(sent)):
                 #print(sent)
-                iword, owords = self.skipgram(sent, 0)
-                if iword=="<UNK>":
+        #if iword=="<UNK>":
                     #print(iword)
-                    no_input+=1
-                    continue
-                elif len(set(owords))==1:
+            #        no_input+=1
+            #        continue
+            #    elif len(set(owords))==1:
                     #print(owords)
-                    no_target+=1
-                    continue
-                else:
-                    data.append((self.word2idx[iword], [self.word2idx[oword] for oword in owords]))
-        print("{0}x no input, {1}x no target".format(no_input, no_target))
+            #        no_target+=1
+            #        continue
+            #    else:
+        for i in range(len(sent)):
+            iword, owords = self.skipgram(sent, i)
+            #print(iword)
+            #print(owords)
+            data.append((self.word2idx[iword], [self.word2idx[oword] for oword in owords]))
+        #print("{0}x no input, {1}x no target".format(no_input, no_target))
         print(len(data))
+        print(data[:5])
         pickle.dump(data, open(os.path.join(self.data_dir, 'train.dat'), 'wb'))
         print("conversion done")
 
@@ -105,5 +120,8 @@ class Preprocess(object):
 if __name__ == '__main__':
     args = parse_args()
     preprocess = Preprocess(window=args.window, unk=args.unk, data_dir=args.data_dir)
+    preprocess.process_file(args.corpus)
+    #print(text[:20])
+    print(len(preprocess.text))
     preprocess.build(args.vocab, max_vocab=args.max_vocab)
     preprocess.convert(args.corpus)
